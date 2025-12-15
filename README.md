@@ -5,9 +5,7 @@
 ---
 
 ## 👤 Informasi Pengembang
-* **Nama:** Kezia Febiola Angriani
-* **NPM:** 230612265
-* **Mata Kuliah:** Pemrograman GUI / Proyek Akhir
+* **Nama:** brawidya
 
 ---
 
