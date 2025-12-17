@@ -112,13 +112,13 @@ class AplikasiCaloriku:
     def buka_hitung_kalori(self):
         self.win_hitung = tk.Toplevel()
         self.win_hitung.title("Kalkulator Resep")
-        self.win_hitung.geometry("800x600") # Sedikit diperbesar
+        self.win_hitung.geometry("800x600") 
         self.win_hitung.configure(bg="white")
 
         menubar_hitung = tk.Menu(self.win_hitung)
         menu_analisis = tk.Menu(menubar_hitung, tearoff=0)
-        menu_analisis.add_command(label="Lihat Grafik Visual (Bar & Pie)", command=self.tampilkan_grafik)
-        menubar_hitung.add_cascade(label="Analisis / Grafik", menu=menu_analisis)
+        menu_analisis.add_command(label="Lihat Grafik (Bar & Pie)", command=self.tampilkan_grafik)
+        menubar_hitung.add_cascade(label="Grafik", menu=menu_analisis)
 
         menu_file = tk.Menu(menubar_hitung, tearoff=0)
         menu_file.add_command(label="Export ke Excel", command=self.simpan_laporan_excel)
@@ -138,7 +138,7 @@ class AplikasiCaloriku:
 
         tk.Label(frame_kiri, text="Jumlah Porsi:", bg="white").pack(anchor="w", pady=(10, 0))
 
-        self.sb_porsi = tk.Spinbox(frame_kiri, from_=1, to=100, textvariable=self.var_porsi, command=self.update_total_kalori)
+        self.sb_porsi = tk.Spinbox(frame_kiri, from_=1, to=100, textvariable=self.var_porsi, command=self.total_kalori)
         self.sb_porsi.pack(fill="x", pady=5)
         self.sb_porsi.bind("<KeyRelease>", lambda event: self.update_total_kalori())
 
@@ -173,8 +173,7 @@ class AplikasiCaloriku:
 
         self.lbl_total = tk.Label(frame_kanan, text="Total: 0 Kcal", font=("Arial", 14, "bold"), bg="white", fg="red")
         self.lbl_total.pack(pady=10, anchor="e")
-        tk.Button(frame_kanan, text="💾 Export Laporan Cepat", command=self.simpan_laporan_excel, bg="#4CAF50", fg="white").pack(fill="x", pady=5)
-
+    
     def simpan_bahan_baru(self):
         nama = self.ent_nama_baru.get()
         kat = self.cb_kategori_baru.get()
@@ -212,10 +211,9 @@ class AplikasiCaloriku:
                 "Kalori": total_kal
             })
             self.tree.insert("", "end", values=(nama_bahan, data_ketemu['kategori'], gram, f"{total_kal:.1f}"))
-            self.update_total_kalori()
+            self.total_kalori()
 
-    def update_total_kalori(self):
-        # Hitung total bahan dasar
+    def total_kalori(self):
         total_bahan = 0
         for item in self.data_resep:
             total_bahan += item['Kalori']
@@ -265,9 +263,13 @@ class AplikasiCaloriku:
         if not self.data_resep: 
             messagebox.showwarning("Peringatan", "Data resep kosong!")
             return
-        
-        file_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")])
-        if not file_path: return
+    
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx")]
+        )
+        if not file_path:
+            return
 
         try:
             kategori_dict = {}
@@ -275,23 +277,38 @@ class AplikasiCaloriku:
                 kat = item['Kategori']
                 cal = item['Kalori']
                 kategori_dict[kat] = kategori_dict.get(kat, 0) + cal
+                
+            plt.figure(figsize=(10, 5))
+            plt.suptitle("Analisis Gizi Resep", fontsize=14)
             
-            plt.figure(figsize=(8, 4))
-            plt.bar(kategori_dict.keys(), kategori_dict.values(), color='skyblue')
-            plt.title("Analisis Resep")
+            plt.subplot(1, 2, 1)
+            plt.pie(
+                kategori_dict.values(),
+                labels=kategori_dict.keys(),
+                autopct='%1.1f%%',
+                startangle=90
+            )
+            plt.title("Komposisi Kategori")
+
+            plt.subplot(1, 2, 2)
+            plt.bar(kategori_dict.keys(), kategori_dict.values())
+            plt.title("Kalori per Kategori")
+            plt.ylabel("Kalori")
+
+            plt.tight_layout()
             plt.savefig("grafik_temp.png")
             plt.close()
-
+            
             try:
                 porsi = int(self.var_porsi.get())
             except:
                 porsi = 1
 
-            df = pd.DataFrame(self.data_resep)            
-            
+            df = pd.DataFrame(self.data_resep)
+
             writer = pd.ExcelWriter(file_path, engine='openpyxl')
             df.to_excel(writer, sheet_name='Laporan', startrow=5, index=False)
-            
+
             ws = writer.book['Laporan']
             ws['A1'] = "NAMA RESEP:"
             ws['B1'] = self.var_nama_resep.get()
@@ -302,20 +319,21 @@ class AplikasiCaloriku:
 
             total_kal = sum(item['Kalori'] for item in self.data_resep) * porsi
             ws['A4'] = f"TOTAL KALORI ({porsi} PORSI): {total_kal:.1f} Kcal"
-            
+
             from openpyxl.drawing.image import Image
             img = Image("grafik_temp.png")
             ws.add_image(img, 'F1')
-            
+
             writer.close()
 
             if os.path.exists("grafik_temp.png"):
                 os.remove("grafik_temp.png")
-                
+
             messagebox.showinfo("Sukses", "Laporan berhasil diexport!")
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
+
 
     def logout(self):
         answer = messagebox.askyesno("Konfirmasi", "Yakin mau logout?")
