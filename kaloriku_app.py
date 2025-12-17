@@ -18,11 +18,10 @@ class AplikasiCaloriku:
         
         self.AKUN_USER = {"kezia": "login"}
         
-        # Data bahan makanan awal
         self.db_bahan = [
             {"nama": "Nasi Putih", "kategori": "Karbohidrat", "kalori": 130},
             {"nama": "Dada Ayam", "kategori": "Protein", "kalori": 165},
-            {"nama": "Telur Rebus", "kategori": "Protein", "kalori": 155}
+            {"nama": "Bayam", "kategori": "Sayuran", "kalori": 23}
         ]
     
         self.data_resep = []
@@ -113,17 +112,35 @@ class AplikasiCaloriku:
     def buka_hitung_kalori(self):
         self.win_hitung = tk.Toplevel()
         self.win_hitung.title("Kalkulator Resep")
-        self.win_hitung.geometry("800x550")
+        self.win_hitung.geometry("800x600") # Sedikit diperbesar
         self.win_hitung.configure(bg="white")
+
+        menubar_hitung = tk.Menu(self.win_hitung)
+        menu_analisis = tk.Menu(menubar_hitung, tearoff=0)
+        menu_analisis.add_command(label="Lihat Grafik Visual (Bar & Pie)", command=self.tampilkan_grafik)
+        menubar_hitung.add_cascade(label="Analisis / Grafik", menu=menu_analisis)
+
+        menu_file = tk.Menu(menubar_hitung, tearoff=0)
+        menu_file.add_command(label="Export ke Excel", command=self.simpan_laporan_excel)
+        menubar_hitung.add_cascade(label="File", menu=menu_file)
+
+        self.win_hitung.config(menu=menubar_hitung)
 
         self.var_nama_resep = tk.StringVar()
         self.var_gram = tk.DoubleVar(value=100)
-        
+        self.var_porsi = tk.IntVar(value=1) 
+
         frame_kiri = tk.LabelFrame(self.win_hitung, text="Input Resep", bg="white", padx=10, pady=10)
         frame_kiri.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
         tk.Label(frame_kiri, text="Nama Resep:", bg="white").pack(anchor="w")
         tk.Entry(frame_kiri, textvariable=self.var_nama_resep).pack(fill="x", pady=5)
+
+        tk.Label(frame_kiri, text="Jumlah Porsi:", bg="white").pack(anchor="w", pady=(10, 0))
+
+        self.sb_porsi = tk.Spinbox(frame_kiri, from_=1, to=100, textvariable=self.var_porsi, command=self.update_total_kalori)
+        self.sb_porsi.pack(fill="x", pady=5)
+        self.sb_porsi.bind("<KeyRelease>", lambda event: self.update_total_kalori())
 
         tk.Label(frame_kiri, text="Pilih Bahan:", bg="white").pack(anchor="w", pady=(10, 0))
         list_nama = []
@@ -156,11 +173,7 @@ class AplikasiCaloriku:
 
         self.lbl_total = tk.Label(frame_kanan, text="Total: 0 Kcal", font=("Arial", 14, "bold"), bg="white", fg="red")
         self.lbl_total.pack(pady=10, anchor="e")
-
-        frame_btn = tk.Frame(frame_kanan, bg="white")
-        frame_btn.pack(fill="x")
-        tk.Button(frame_btn, text="📊 Lihat Grafik", command=self.tampilkan_grafik,bg="#4CAF50", fg="white").pack(side="left", fill="x", expand=True, padx=2)
-        tk.Button(frame_btn, text="💾 Export Laporan", command=self.simpan_laporan_excel, bg="#4CAF50", fg="white").pack(side="right", fill="x", expand=True, padx=2)
+        tk.Button(frame_kanan, text="💾 Export Laporan Cepat", command=self.simpan_laporan_excel, bg="#4CAF50", fg="white").pack(fill="x", pady=5)
 
     def simpan_bahan_baru(self):
         nama = self.ent_nama_baru.get()
@@ -202,15 +215,25 @@ class AplikasiCaloriku:
             self.update_total_kalori()
 
     def update_total_kalori(self):
-        total = 0
+        # Hitung total bahan dasar
+        total_bahan = 0
         for item in self.data_resep:
-            total += item['Kalori']
-        self.lbl_total.config(text=f"Total: {total:.1f} Kcal")
+            total_bahan += item['Kalori']
+  
+        try:
+            porsi = int(self.var_porsi.get())
+        except (ValueError, tk.TclError):
+            porsi = 1
+
+        grand_total = total_bahan * porsi
+        
+        self.lbl_total.config(text=f"Total ({porsi} Porsi): {grand_total:.1f} Kcal")
 
     def tampilkan_grafik(self):
         if not self.data_resep:
             messagebox.showwarning("Kosong", "Belum ada resep!")
             return
+        
         kategori_dict = {}
         for item in self.data_resep:
             kat = item['Kategori']
@@ -224,7 +247,7 @@ class AplikasiCaloriku:
         values = list(kategori_dict.values())
 
         plt.figure(figsize=(10, 5))
-        plt.suptitle("Analisis Gizi Resep", fontsize=16)
+        plt.suptitle("Analisis Gizi Resep (Perbandingan Komposisi)", fontsize=16)
     
         plt.subplot(1, 2, 1)
         plt.pie(values, labels=labels, autopct='%1.1f%%', startangle=90, colors=['#ff9999','#66b3ff','#99ff99','#ffcc99'])
@@ -232,14 +255,16 @@ class AplikasiCaloriku:
 
         plt.subplot(1, 2, 2)
         plt.bar(labels, values, color='#66b3ff')
-        plt.title("Kalori per Kategori")
+        plt.title("Kalori per Kategori (Resep Dasar)")
         plt.ylabel("Kalori")
 
         plt.tight_layout()
         plt.show()
 
     def simpan_laporan_excel(self):
-        if not self.data_resep: return
+        if not self.data_resep: 
+            messagebox.showwarning("Peringatan", "Data resep kosong!")
+            return
         
         file_path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")])
         if not file_path: return
@@ -257,16 +282,26 @@ class AplikasiCaloriku:
             plt.savefig("grafik_temp.png")
             plt.close()
 
+            try:
+                porsi = int(self.var_porsi.get())
+            except:
+                porsi = 1
+
             df = pd.DataFrame(self.data_resep)            
-            writer = pd.ExcelWriter(file_path, engine='openpyxl')
             
-            df.to_excel(writer, sheet_name='Laporan', startrow=4, index=False)
+            writer = pd.ExcelWriter(file_path, engine='openpyxl')
+            df.to_excel(writer, sheet_name='Laporan', startrow=5, index=False)
             
             ws = writer.book['Laporan']
             ws['A1'] = "NAMA RESEP:"
             ws['B1'] = self.var_nama_resep.get()
-            ws['A2'] = "TANGGAL:"
-            ws['B2'] = datetime.now().strftime("%Y-%m-%d")
+            ws['A2'] = "JUMLAH PORSI:"
+            ws['B2'] = porsi
+            ws['A3'] = "TANGGAL:"
+            ws['B3'] = datetime.now().strftime("%Y-%m-%d")
+
+            total_kal = sum(item['Kalori'] for item in self.data_resep) * porsi
+            ws['A4'] = f"TOTAL KALORI ({porsi} PORSI): {total_kal:.1f} Kcal"
             
             from openpyxl.drawing.image import Image
             img = Image("grafik_temp.png")
